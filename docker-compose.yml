@@ -4,7 +4,7 @@
 version: "3.5"
 #definimos los servicios (1 en este caso y los nombres)
 services:
-  go-course-web:
+  go-micro-user:
     platform: linux/amd64
     container_name: go-micro-user
     build: #build especificaremos donde esta el dockerfile
