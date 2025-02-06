@@ -1,0 +1,2 @@
+#Para omitir el .env por variables sensibles
+.env
