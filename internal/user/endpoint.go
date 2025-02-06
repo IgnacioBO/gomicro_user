@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/IgnacioBO/gomicro_meta/meta"
@@ -57,18 +56,23 @@ type (
 		Err    string      `json:"error,omitempty"`
 		Meta   *meta.Meta  `json:"meta,omitempty"`
 	}
+
+	//Struct para guardar la cant page por defecto y otras conf
+	Config struct {
+		LimitPageDefault string
+	}
 )
 
 // Funcion que se encargará de hacer los endopints
 // Para eso necesitaremos una struct que se llamara endpoints
 // Esta funcion va a DEVOLVER una struct de Endpoints, estos endpoints son los que vamos a poder utuaizlar en unestro dominio (user)
-func MakeEndpoints(s Service) Endpoints {
+func MakeEndpoints(s Service, config Config) Endpoints {
 	return Endpoints{
 		Create: makeCreateEndpoint(s),
 		Get:    makeGetEndpoint(s),
 		Update: makeUpdateEndpoint(s),
 		Delete: makeDeleteEndpoint(s),
-		GetAll: makeGetAllEndpoint(s),
+		GetAll: makeGetAllEndpoint(s, config),
 	}
 }
 
@@ -219,7 +223,7 @@ func makeGetEndpoint(s Service) Controller {
 
 	}
 }
-func makeGetAllEndpoint(s Service) Controller {
+func makeGetAllEndpoint(s Service, config Config) Controller {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("getall user")
 		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
@@ -244,7 +248,7 @@ func makeGetAllEndpoint(s Service) Controller {
 			return
 		}
 		//Luego crearemos un meta y le agregaremos la cantidad que consultamos, luego el meta lo ageregaremos a la respuesta
-		meta, err := meta.New(page, limit, cantidad, os.Getenv("PAGINATOR_LIMIT_DEFAULT"))
+		meta, err := meta.New(page, limit, cantidad, config.LimitPageDefault)
 
 		allUsers, err := s.GetAll(filtros, meta.Offset(), meta.Limit()) //GetAll recibe el offset (desde q resultado mostrar) y el limit (cuantos desde el offset)
 		if err != nil {

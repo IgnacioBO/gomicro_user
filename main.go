@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/IgnacioBO/gomicro_user/internal/user"
@@ -28,6 +29,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	//Creamos un config que tenga la cant max de pagina por defecto
+	pageLimDef := os.Getenv("PAGINATOR_LIMIT_DEFAULT")
+	if pageLimDef == "" {
+		l.Fatal("paginator limit default is required")
+	}
+	userConfig := user.Config{LimitPageDefault: pageLimDef}
+
 	//DSN (Data Source Name) es una cadena de conexion de BBDD (tipo, servidor, nombre bbdd, user, pass)
 	//Creamos un script bootsrap.go que INICIALIZA la conexion usando gorm y varaibles de entoero
 	db, err := bootstrap.DBConnection()
@@ -39,8 +47,8 @@ func main() {
 	userRepo := user.NewRepo(l, db)
 	//Crearemos un objeto de tipo servicio pasandole un objeto Repository (y logger) para luego pasarselo a la capa enpdoint
 	userService := user.NewService(l, userRepo)
-	//Crearemo un objeto de tipo endpoint y le pasamos el objeto creado (Service)
-	userEndpoint := user.MakeEndpoints(userService)
+	//Crearemo un objeto de tipo endpoint y le pasamos el objeto creado (Service). Ademas le pasamos un user.Config
+	userEndpoint := user.MakeEndpoints(userService, userConfig)
 
 	//Ahora setearemos que cuando le pegemos a /users le pege a las funciones definidas en el controlador user
 	//Con handlefunc decimos que cuando valla a /users se ejecute la funcion correspondiente (userEnd.Create, Get, etc)
@@ -51,8 +59,7 @@ func main() {
 	router.HandleFunc("/users/{id}", userEndpoint.Delete).Methods("DELETE") //Delete o SoftDelete
 	router.HandleFunc("/users/{id}", userEndpoint.Get).Methods("GET")       //Usamos {} para especifiar el NOMBRE del paramatro (que se obtiene con MUX dentro de endpoint.go)
 	srv := &http.Server{
-		Handler: router,
-		//Handler:    http.TimeoutHandler(router, time.Second*3, "Timeeout!"), //Usnado TimeoutHandler permite manejar timeout con mensaje (diferente al read y writetomiiut)
+		Handler:      router,
 		Addr:         "127.0.0.1:8001",
 		ReadTimeout:  5 * time.Second, //Con estos SETEAMOS TIMEOUT DE ESCRITURA Y DE LECTURA (cuanto timepo maximo la api permite)
 		WriteTimeout: 5 * time.Second, // Read es REQUEST, WRITE es RESPONE
