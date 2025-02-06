@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -58,9 +59,13 @@ func main() {
 	router.HandleFunc("/users/{id}", userEndpoint.Update).Methods("PATCH")  //Usamos {} para especifiar el NOMBRE del paramatro (que se obtiene con MUX dentro de endpoint.go) //Patch es ACT parcial (PUT es completa)
 	router.HandleFunc("/users/{id}", userEndpoint.Delete).Methods("DELETE") //Delete o SoftDelete
 	router.HandleFunc("/users/{id}", userEndpoint.Get).Methods("GET")       //Usamos {} para especifiar el NOMBRE del paramatro (que se obtiene con MUX dentro de endpoint.go)
+
+	port := os.Getenv("PORT")
+	address := fmt.Sprintf("127.0.0.1:%s", port)
+
 	srv := &http.Server{
 		Handler:      router,
-		Addr:         "127.0.0.1:8001",
+		Addr:         address,
 		ReadTimeout:  5 * time.Second, //Con estos SETEAMOS TIMEOUT DE ESCRITURA Y DE LECTURA (cuanto timepo maximo la api permite)
 		WriteTimeout: 5 * time.Second, // Read es REQUEST, WRITE es RESPONE
 	}
