@@ -5,9 +5,9 @@ package user
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
+	"github.com/IgnacioBO/go_lib_response/response"
 	"github.com/IgnacioBO/gomicro_meta/meta"
 )
 
@@ -16,7 +16,7 @@ import (
 type (
 	//Como usaremos gokit cambiaremos el conrtoller para que tenga los datos que necesita gokit (reciviendo context, interface) y devolvendo interface y error
 	//OSEA ahora el controller tendra el request YA MAPEADO en el struct que corresponda (por ejempo el struct CreateRequest o UpdateRequest)
-	Controller func(ctx context.Context, request interface{}) (repsonse interface{}, err error)
+	Controller func(ctx context.Context, request interface{}) (interface{}, error)
 
 	Endpoints struct {
 		Create        Controller //Esto es lo mismo que decir Create func(w http.ResponseWriter, r *http.Request), pero como TODOS SON tipo Controller (Definido arriba) nos ahorramos ahcerlo
@@ -106,7 +106,7 @@ func makeDeleteEndpoint(s Service) Controller {
 
 // request (interface{}) lo pasará el middleware y TENDRA ya los datos del request en un struct listo para usar
 func makeCreateEndpoint(s Service) Controller {
-	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		fmt.Println("create user")
 		//w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
@@ -119,10 +119,12 @@ func makeCreateEndpoint(s Service) Controller {
 
 		//Validaciones
 		if reqStruct.FirstName == "" {
-			return nil, errors.New("first_name is required")
+			//return nil, errors.New("first_name is required")
+			return nil, response.BadRequest("first_name is required")
+
 		}
 		if reqStruct.LastName == "" {
-			return nil, errors.New("last_name is required")
+			return nil, response.BadRequest("last_name is required")
 		}
 		fmt.Println(reqStruct)
 		reqStrucEnJson, _ := json.MarshalIndent(reqStruct, "", " ")
@@ -131,11 +133,11 @@ func makeCreateEndpoint(s Service) Controller {
 		//Usaremos la s recibida como parametro (de la capa Service y usaremos el metodo CREATE con lo que debe recibir)
 		usuarioNuevo, err := s.Create(ctx, reqStruct.FirstName, reqStruct.LastName, reqStruct.Email, reqStruct.Phone)
 		if err != nil {
-			return nil, err
+			return nil, response.InternalServerError(err.Error())
 		}
 
 		//Aqui retornarmeos la interface (otro middlewre se encargará de "enviar" la response en base al interface)
-		return usuarioNuevo, nil
+		return response.Created("success", usuarioNuevo, nil, 200), nil
 	}
 }
 
