@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/IgnacioBO/go_lib_response/response"
-	"github.com/IgnacioBO/gomicro_meta/meta"
 )
 
 // Struct que tenga todos los endpoints que vayamos a utilizar
@@ -40,22 +39,6 @@ type (
 		LastName  *string `json:"last_name"`
 		Email     *string `json:"email"`
 		Phone     *string `json:"phone"`
-	}
-
-	MsgResponse struct {
-		ID  string `json:"id"`
-		Msg string `json:"msg"`
-	}
-
-	//Este sera el "response" generico, para tener una estructura
-	//El status SIEMPRE sera devuelto
-	//El campo data SOLO aparecera cuando esta todo OK y dentro ira la estructura
-	//El campo error SOLO aparecera cuando hay error
-	Response struct {
-		Status int         `json:"status"`
-		Data   interface{} `json:"data,omitempty"` //omitempty, asi cuando queremos enviamos la data cuando eta ok y cuando este eror se envie el campo error
-		Err    string      `json:"error,omitempty"`
-		Meta   *meta.Meta  `json:"meta,omitempty"`
 	}
 
 	//Struct para guardar la cant page por defecto y otras conf
