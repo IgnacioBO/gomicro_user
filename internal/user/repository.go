@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -13,13 +14,15 @@ import (
 //Se crea similar a la capa de servicio
 
 // Generaremos una interface
+// Agregaremos contexto en cada funcion del repositorio
+// No se usará en todos, pero debe implementare como buena practica en microservicios x si la necesitamos
 type Repository interface {
-	Create(user *domain.User) error                                   //Metodo create y recibe un Puntero de un domain.User (Struct creado en el de domain.go, que tiene los campso de BBDD en gorn)
-	GetAll(filtros Filtros, offset, limit int) ([]domain.User, error) //Le agregamos que getAll reciba filtros
-	Get(id string) (*domain.User, error)
-	Delete(id string) error
-	Update(id string, firstName *string, lastName *string, email *string, phone *string) error //Campos por separado y como punteros (porque si no lo pongo puntero, si llega un string vacio TENDRA valor y actualizará VACIO)
-	Count(Filtros Filtros) (int, error)                                                        //Servirá para contar cantidad de registrosy recibe los mismo filtros del getall y devolera int(cantidad de registros) y error
+	Create(ctx context.Context, user *domain.User) error                                   //Metodo create y recibe un Puntero de un domain.User (Struct creado en el de domain.go, que tiene los campso de BBDD en gorn)
+	GetAll(ctx context.Context, filtros Filtros, offset, limit int) ([]domain.User, error) //Le agregamos que getAll reciba filtros
+	Get(ctx context.Context, id string) (*domain.User, error)
+	Delete(ctx context.Context, id string) error
+	Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error //Campos por separado y como punteros (porque si no lo pongo puntero, si llega un string vacio TENDRA valor y actualizará VACIO)
+	Count(ctx context.Context, Filtros Filtros) (int, error)                                                        //Servirá para contar cantidad de registrosy recibe los mismo filtros del getall y devolera int(cantidad de registros) y error
 }
 
 // Ahora una struct que hacer referncia de bbdd de GORN
@@ -41,16 +44,11 @@ func NewRepo(log *log.Logger, db *gorm.DB) Repository {
 
 }
 
-func (r *repo) Create(user *domain.User) error {
+func (r *repo) Create(ctx context.Context, user *domain.User) error {
 	r.log.Println("repository Create:", user)
-	//Aqui zcraeremos el UUID (pq es la capa repository) del usuario usando el package uuid: go get github.com/google/uuid
-	//Ese UUID se lo asignaremos al campo ID del user recibido
-	//Ahora usaremos HOOKs de GORN, ahora el domain.go se encargara de hacer el uuid SIEMPRE, antes de un CREATE de manera AUTOMATICA con la funcion "BeforeCreate()"
-	//user.ID = uuid.New().String()
-
 	//Objeto db tiene el metodo Create (de GORM) y le pasamos la entidad
-	result := r.db.Create(user)
-	//Si hay error al insertar (x ejemplo nombre muy largo), retornara el error (a la capa servicio)
+	//A todas las funciones de bbdd le agregaremos el contexto
+	result := r.db.WithContext(ctx).Create(user)
 	//Una manera mas rapida es (por ahora lo omito por enredad) if err := r.db.Create(user).Error; err =! nil {}
 	if result.Error != nil {
 		r.log.Println(result.Error)
@@ -60,7 +58,7 @@ func (r *repo) Create(user *domain.User) error {
 	return nil
 }
 
-func (r *repo) GetAll(filtros Filtros, offset, limit int) ([]domain.User, error) {
+func (r *repo) GetAll(ctx context.Context, filtros Filtros, offset, limit int) ([]domain.User, error) {
 	r.log.Println("repository GetAll:")
 
 	var allUsers []domain.User //Variable que almacenará los usuarios obtenidos
@@ -72,7 +70,7 @@ func (r *repo) GetAll(filtros Filtros, offset, limit int) ([]domain.User, error)
 	//AHora se cambiara y le podnremos filtros
 
 	//Primero especificamos el modelo y nos devovlera un gorm.DB* con el modelo listo
-	tx := r.db.Model(&allUsers)
+	tx := r.db.WithContext(ctx).Model(&allUsers)
 	//Luego a esta db con el modelo le aplicaremos filtros
 	tx = aplicarFiltros(tx, filtros)
 	//AGREGAMOS NUEVO QUE PEMRITE CALCULAR EL OFFSET Y LIMT // offset es a parti de que resultado se muestra, por ejemplo si es 4, se parte del 5* y limit es cantidad desde ese offset
@@ -87,16 +85,14 @@ func (r *repo) GetAll(filtros Filtros, offset, limit int) ([]domain.User, error)
 	return allUsers, nil
 }
 
-func (r *repo) Get(id string) (*domain.User, error) {
+func (r *repo) Get(ctx context.Context, id string) (*domain.User, error) {
 	r.log.Println("repository Get by id:")
 
 	//Creamos un domain.User y le pasamos el ID a buscar
 	usuario := domain.User{ID: id}
 
-	//yo lo hice asi: result := r.db.First(&usuario, "id=?", id)
-	//Aqui usuando First se le puede pasar el struct y lo analiza, como pusimos a este usaurio le pusimos ID, buscara por ese ID
 	//Ojo usar First y no FIND, porque Find devolvera 0, pero no error
-	result := r.db.First(&usuario)
+	result := r.db.WithContext(ctx).First(&usuario)
 	if result.Error != nil {
 		r.log.Println(result.Error)
 		return nil, result.Error
@@ -105,7 +101,7 @@ func (r *repo) Get(id string) (*domain.User, error) {
 	return &usuario, nil
 }
 
-func (r *repo) Delete(id string) error {
+func (r *repo) Delete(ctx context.Context, id string) error {
 	r.log.Println("repository Delete by id:")
 
 	//Creamos un domain.User y le pasamos el ID a eliminar
@@ -113,7 +109,7 @@ func (r *repo) Delete(id string) error {
 
 	//Si esta el campo deleteAt en el domain (domain.User{}), es un SofDelete, si no esta es un delete normal
 	//Si tiengo el campo deleteAt, y quiero hacer un delete normal : db.Unscoped().Delete(&order)
-	result := r.db.Delete(&usuario)
+	result := r.db.WithContext(ctx).Delete(&usuario)
 	if result.Error != nil {
 		r.log.Println(result.Error)
 		return result.Error
@@ -128,7 +124,7 @@ func (r *repo) Delete(id string) error {
 
 // Recibo String pero como PUNTEROS *, porque asi si podemos distinguir entre vacío (por ejemplo cliente envia phone="") y nil (nil seria que NO envío el campo)
 // Si no usamso puntero un string sin valor seria "", en cambio un string puntero sin valor seria nil
-func (r *repo) Update(id string, firstName *string, lastName *string, email *string, phone *string) error {
+func (r *repo) Update(ctx context.Context, id string, firstName *string, lastName *string, email *string, phone *string) error {
 	r.log.Println("repository Update")
 	//Usaremos un MAP, porque si usamos el struct, NO ACTUALIZA VALORES CERO (osea "", 0, false)
 	//Al usar un map es [string]intareface{}, se usa interface en el valor porque peude ser numerico, string, bool
@@ -150,9 +146,11 @@ func (r *repo) Update(id string, firstName *string, lastName *string, email *str
 		valores["phone"] = *phone
 	}
 
-	result := r.db.Model(domain.User{}).Where("id = ?", id).Updates(valores)
+	result := r.db.WithContext(ctx).Model(domain.User{}).Where("id = ?", id).Updates(valores)
 
 	if result.Error != nil {
+		//Tambien imprimieros los errores en esta capa, ya no imprimiermos en la capa servicio
+		r.log.Println(result.Error)
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
@@ -184,10 +182,10 @@ func aplicarFiltros(tx *gorm.DB, filtros Filtros) *gorm.DB {
 }
 
 // Funcion que permitira contar la cantidad de registros devueltos en un get
-func (r *repo) Count(filtros Filtros) (int, error) {
+func (r *repo) Count(ctx context.Context, filtros Filtros) (int, error) {
 	var cantidad int64
 	//Creamos un db usando el modelo de user vacio
-	tx := r.db.Model(domain.User{})
+	tx := r.db.WithContext(ctx).Model(domain.User{})
 	//Luego le aplicamos filtros (los where)
 	tx = aplicarFiltros(tx, filtros)
 	//Ahora le aplicamos COunt a la base da datos que permite consutlar con filtros y devuelev SOLO LA CANTIADA DE RESUTLADOS y se guardara en &cantidad
@@ -195,6 +193,8 @@ func (r *repo) Count(filtros Filtros) (int, error) {
 	//¿Hare doble consulta entonces (pq despues del count debo hacer un select)? SI, pero esto permitira hacer una paginacion, asi preguntar catnidad de resultados primero y luego paginar
 	tx = tx.Count(&cantidad)
 	if tx.Error != nil {
+		//Tambien imprimieros los errores en esta capa, ya no imprimiermos en la capa servicio
+		r.log.Println(tx.Error)
 		return 0, tx.Error
 	}
 

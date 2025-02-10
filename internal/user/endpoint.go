@@ -3,21 +3,22 @@ package user
 //**Capa endpoint o controlador**
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"net/http"
-	"strconv"
 
 	"github.com/IgnacioBO/gomicro_meta/meta"
-	"github.com/gorilla/mux"
 )
 
 // Struct que tenga todos los endpoints que vayamos a utilizar
 // Que teng una fucion que recibe un request y un response
 type (
-	//Controller sera una funcion que reciba REspone y Request
-	Controller func(w http.ResponseWriter, r *http.Request)
-	Endpoints  struct {
+	//Como usaremos gokit cambiaremos el conrtoller para que tenga los datos que necesita gokit (reciviendo context, interface) y devolvendo interface y error
+	//OSEA ahora el controller tendra el request YA MAPEADO en el struct que corresponda (por ejempo el struct CreateRequest o UpdateRequest)
+	Controller func(ctx context.Context, request interface{}) (repsonse interface{}, err error)
+
+	Endpoints struct {
 		Create        Controller //Esto es lo mismo que decir Create func(w http.ResponseWriter, r *http.Request), pero como TODOS SON tipo Controller (Definido arriba) nos ahorramos ahcerlo
 		Get           Controller
 		GetAll        Controller
@@ -69,17 +70,19 @@ type (
 func MakeEndpoints(s Service, config Config) Endpoints {
 	return Endpoints{
 		Create: makeCreateEndpoint(s),
-		Get:    makeGetEndpoint(s),
-		Update: makeUpdateEndpoint(s),
-		Delete: makeDeleteEndpoint(s),
-		GetAll: makeGetAllEndpoint(s, config),
+		/*
+			Get:    makeGetEndpoint(s),
+			Update: makeUpdateEndpoint(s),
+			Delete: makeDeleteEndpoint(s),
+			GetAll: makeGetAllEndpoint(s, config),*/
 	}
 }
 
 // Este devolver un Controller, retora una función de tipo Controller (que definimos arriba) con esta caractesitica
 // Es privado porque se llamar solo de este dominio
+/*
 func makeDeleteEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
 		fmt.Println("delete user")
 		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
@@ -99,61 +102,46 @@ func makeDeleteEndpoint(s Service) Controller {
 		json.NewEncoder(w).Encode(&Response{Status: 200, Data: map[string]string{"id": id, "msg": "success"}})
 	}
 }
+*/
 
-// w http.ResponseWriter -> Para enviar RESPUESTA AL CLIENTE (body, headers, statsu code)
-// r *http.Request -> Contiende info de la SOLICITUD/REQUEST del cliente (aaceder al metodo http (GET,POST,ETC), paarametros url/query string, body, headers, etc
-// *http.Request siempre como PUNTERO (*) por mas eficiencia, para poder modificar datos y es el estandar del package net/http
+// request (interface{}) lo pasará el middleware y TENDRA ya los datos del request en un struct listo para usar
 func makeCreateEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
 		fmt.Println("create user")
-		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
+		//w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
 		//Variable con struct de request (datos usaurio)
-		var reqStruct CreateRequest
-		//r.Body tiene el body del request (se espera JSON) y lo decodifica al struct (reqStruct) (osea pasar el json enviado en el request a un struct)
-		err := json.NewDecoder(r.Body).Decode(&reqStruct)
-		if err != nil {
-			//w.WriteHeader devuelve en el repsonse el CODE que se le indica
-			w.WriteHeader(400)
-			//Enviaremos la repsuesta con encode y creamos un Sruct ErrorRespone (Creado antes) con un texto
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "invalid request format"})
-
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "invalid request format"})
-			return
-		}
+		//Aqui hacemo una asersion type assertion (.(CreateRequest)) sobre request
+		//Osea asumimos que request (interface{}) es de tupo CreteRequest y se le asignamos a reqStrut
+		//Si request NO ES de tipo CreateRqueste se tirara un PANIC
+		//requStruct ya tendra todos ls valoers del request, pq se los pasa el middleware desde el parametor "request", asi que podems acceder diretamente
+		reqStruct := request.(CreateRequest)
 
 		//Validaciones
 		if reqStruct.FirstName == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "first_name is required"})
-			return
+			return nil, errors.New("first_name is required")
 		}
 		if reqStruct.LastName == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "last_name is required"})
-			return
+			return nil, errors.New("last_name is required")
 		}
 		fmt.Println(reqStruct)
 		reqStrucEnJson, _ := json.MarshalIndent(reqStruct, "", " ")
 		fmt.Println(string(reqStrucEnJson))
 
 		//Usaremos la s recibida como parametro (de la capa Service y usaremos el metodo CREATE con lo que debe recibir)
-		usuarioNuevo, err := s.Create(reqStruct.FirstName, reqStruct.LastName, reqStruct.Email, reqStruct.Phone)
+		usuarioNuevo, err := s.Create(ctx, reqStruct.FirstName, reqStruct.LastName, reqStruct.Email, reqStruct.Phone)
 		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: err.Error()}) //Aqui devolvemo el posible erro
-			return
+			return nil, err
 		}
 
-		//Para responder se usa el paquete json Encode (devolverá en el response(w) un JSON, este JSON será la transformacion del struct en json usando la funcion Encode)
-		//Antes devolviemoas el reqStruct (que ERA LO MISMO QUE ENVIA EL CLIENTE)
-		//Pero ahora devolveremos usuarioNuevo que seria el struct User (del dominio) que tiene como se inserto a la BBDD
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: usuarioNuevo})
+		//Aqui retornarmeos la interface (otro middlewre se encargará de "enviar" la response en base al interface)
+		return usuarioNuevo, nil
 	}
 }
 
+/*
 func makeUpdateEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
 		fmt.Println("update user")
 		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
@@ -196,7 +184,7 @@ func makeUpdateEndpoint(s Service) Controller {
 	}
 }
 func makeGetEndpoint(s Service) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
 		fmt.Println("get user")
 		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
@@ -224,7 +212,7 @@ func makeGetEndpoint(s Service) Controller {
 	}
 }
 func makeGetAllEndpoint(s Service, config Config) Controller {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
 		fmt.Println("getall user")
 		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
@@ -260,3 +248,4 @@ func makeGetAllEndpoint(s Service, config Config) Controller {
 		json.NewEncoder(w).Encode(&Response{Status: 200, Data: allUsers, Meta: meta})
 	}
 }
+*/
