@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/IgnacioBO/go_lib_response/response"
 	"github.com/IgnacioBO/gomicro_user/internal/user"
@@ -40,6 +41,20 @@ func NewUserHTTPServer(ctx context.Context, endpoints user.Endpoints) http.Handl
 	//Ese struct del reques se lo envia el endpoints.Create -> luego va a servicion, repo, etc.
 	//Al finalizar enpdoint.Create retorna el user.User (con struct con tag json, etc)
 	//Luego el encode respone recibe ese user.User (resp interface{}) y luego se envia la respuesta
+
+	router.Handle("/users/{id}", httptransport.NewServer( //Con httptranpsort podemos apsarle un server al HHandle
+		endpoint.Endpoint(endpoints.Get), //Se va al Get del Endpoint
+		decodeGetUser,                    //le pasamos la funcion decodeGetUser (distinta a la de create)
+		encodeResponse,
+		opciones...,
+	)).Methods("GET")
+
+	router.Handle("/users", httptransport.NewServer( //Con httptranpsort podemos apsarle un server al HHandle
+		endpoint.Endpoint(endpoints.GetAll), //Se va al Get del Endpoint
+		decodeGetAllUser,                    //le pasamos la funcion decodeGetAllUser (distinta a la de create)
+		encodeResponse,
+		opciones...,
+	)).Methods("GET")
 
 	return router
 }
@@ -79,5 +94,39 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 	//Entonces podemos transofrmar un error a una interfac propia con MAS METODOS Y MAS DATOS UE UN ERROR NORMAL!
 	w.WriteHeader(respInterface.StatusCode())
 	_ = json.NewEncoder(w).Encode(respInterface) //resp tendra el user.User del domain y otroas datos si es necesario para ocnveritse en json
+
+}
+
+// *** MIDDLEWARE RESPONSE GET ***
+// Funcion de decode, de GET
+func decodeGetUser(_ context.Context, r *http.Request) (interface{}, error) {
+	var getReq user.GetRequest
+	variablesPath := mux.Vars(r)
+	getReq.ID = variablesPath["id"] //OBtenemos el id y lo guardamos en el cmapo ID de getReq
+
+	fmt.Println("id es:", getReq.ID)
+
+	return getReq, nil
+
+}
+
+// *** MIDDLEWARE RESPONSE GET All ***
+// Funcion de decode, de GET
+func decodeGetAllUser(_ context.Context, r *http.Request) (interface{}, error) {
+	//Query() devielve un objeto que permite acceder a los parametros d la url (...?campo=123&campo2=hola)
+	variablesURL := r.URL.Query()
+
+	//Ahora obtendremos el limit y la pagina desde los parametros
+	limit, _ := strconv.Atoi(variablesURL.Get("limit"))
+	page, _ := strconv.Atoi(variablesURL.Get("page"))
+
+	getReqAll := user.GetAllRequest{
+		FirstName: variablesURL.Get("first_name"),
+		LastName:  variablesURL.Get("last_name"),
+		Limit:     limit,
+		Page:      page,
+	}
+
+	return getReqAll, nil
 
 }

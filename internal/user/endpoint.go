@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/IgnacioBO/go_lib_response/response"
+	"github.com/IgnacioBO/gomicro_meta/meta"
 )
 
 // Struct que tenga todos los endpoints que vayamos a utilizar
@@ -41,6 +42,19 @@ type (
 		Phone     *string `json:"phone"`
 	}
 
+	//Un struct base del Get que recibe un string que es el id
+	GetRequest struct {
+		ID string
+	}
+
+	//Este struct tendra los PARAMETROS de la URL para pasarselo
+	GetAllRequest struct {
+		FirstName string
+		LastName  string
+		Limit     int
+		Page      int
+	}
+
 	//Struct para guardar la cant page por defecto y otras conf
 	Config struct {
 		LimitPageDefault string
@@ -53,11 +67,10 @@ type (
 func MakeEndpoints(s Service, config Config) Endpoints {
 	return Endpoints{
 		Create: makeCreateEndpoint(s),
-		/*
-			Get:    makeGetEndpoint(s),
-			Update: makeUpdateEndpoint(s),
-			Delete: makeDeleteEndpoint(s),
-			GetAll: makeGetAllEndpoint(s, config),*/
+		Get:    makeGetEndpoint(s),
+		/*	Update: makeUpdateEndpoint(s),
+			Delete: makeDeleteEndpoint(s),*/
+		GetAll: makeGetAllEndpoint(s, config),
 	}
 }
 
@@ -120,117 +133,102 @@ func makeCreateEndpoint(s Service) Controller {
 		}
 
 		//Aqui retornarmeos la interface (otro middlewre se encargará de "enviar" la response en base al interface)
-		return response.Created("success", usuarioNuevo, nil, 200), nil
+		return response.Created("success", usuarioNuevo, nil), nil
 	}
 }
 
 /*
-func makeUpdateEndpoint(s Service) Controller {
-	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
-		fmt.Println("update user")
-		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
+	func makeUpdateEndpoint(s Service) Controller {
+		return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
+			fmt.Println("update user")
+			w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
-		//Variable con struct de request (datos de atualizacion)
-		var reqStruct UpdateRequest
-		//r.Body tiene el body del request (se espera JSON) y lo decodifica al struct (reqStruct) (osea pasar el json enviado en el request a un struct)
-		err := json.NewDecoder(r.Body).Decode(&reqStruct)
-		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "invalid request format"})
-			return
-		}
-
-		//Validaciones para que sean reqierod
-		//Si first name es disinto de nil (osea el puntero NO VIENE VACIO) y le pone "first_name" como vacio (osea el cliene pone first_name = "") da error
-		//PERO SI EL CLIENTE NO ENVIA first_namem reqStruct.Firstname sera igual a NIL! entonces no entra
-		//OSea se permite NO ENVIAR ESTOS CAMPOS, PERO NO SE PERMITE ENVIARLSO VACIOS
-		if reqStruct.FirstName != nil && *reqStruct.FirstName == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "first_name can't be empty"})
-			return
-		}
-
-		if reqStruct.LastName != nil && *reqStruct.LastName == "" {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: "last_name can't be empty"})
-			return
-		}
-		variablesPath := mux.Vars(r)
-		id := variablesPath["id"]
-
-		err = s.Update(id, reqStruct.FirstName, reqStruct.LastName, reqStruct.Email, reqStruct.Phone)
-		if err != nil {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(Response{Status: 404, Err: err.Error()}) //Aqui devolvemo el posible erro
-			return
-		}
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: map[string]string{"id": id, "msg": "success"}})
-
-	}
-}
-func makeGetEndpoint(s Service) Controller {
-	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
-		fmt.Println("get user")
-		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
-
-		//Aqui usamos MUX para extrar las variables del path (url)
-		//Y con ["id"] obtenemos el valor del parametro {id} definido en el main.go (users/{id})
-		//**¿ESTA BIEN ESTO?? USAMOS LIBRERIA EXTERNA EN "internal/users", no se deberia -> en notasAparte.txt tengo una solucion
-		variablesPath := mux.Vars(r)
-		id := variablesPath["id"]
-		fmt.Println("id es:", id)
-		usuario, err := s.Get(id)
-		if err != nil {
-			if usuario == nil { //Si usuario es vacio da 404
-				w.WriteHeader(404)
-				json.NewEncoder(w).Encode(&Response{Status: 404, Err: err.Error() + ". user with id " + id + " doesn't exist"}) //Aqui devolvemo el posible erro
-				return
-			} else {
+			//Variable con struct de request (datos de atualizacion)
+			var reqStruct UpdateRequest
+			//r.Body tiene el body del request (se espera JSON) y lo decodifica al struct (reqStruct) (osea pasar el json enviado en el request a un struct)
+			err := json.NewDecoder(r.Body).Decode(&reqStruct)
+			if err != nil {
 				w.WriteHeader(400)
-				json.NewEncoder(w).Encode(&Response{Status: 400, Err: err.Error()}) //Aqui devolvemo el posible erro
+				json.NewEncoder(w).Encode(&Response{Status: 400, Err: "invalid request format"})
 				return
 			}
-		}
 
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: usuario})
+			//Validaciones para que sean reqierod
+			//Si first name es disinto de nil (osea el puntero NO VIENE VACIO) y le pone "first_name" como vacio (osea el cliene pone first_name = "") da error
+			//PERO SI EL CLIENTE NO ENVIA first_namem reqStruct.Firstname sera igual a NIL! entonces no entra
+			//OSea se permite NO ENVIAR ESTOS CAMPOS, PERO NO SE PERMITE ENVIARLSO VACIOS
+			if reqStruct.FirstName != nil && *reqStruct.FirstName == "" {
+				w.WriteHeader(400)
+				json.NewEncoder(w).Encode(&Response{Status: 400, Err: "first_name can't be empty"})
+				return
+			}
+
+			if reqStruct.LastName != nil && *reqStruct.LastName == "" {
+				w.WriteHeader(400)
+				json.NewEncoder(w).Encode(&Response{Status: 400, Err: "last_name can't be empty"})
+				return
+			}
+			variablesPath := mux.Vars(r)
+			id := variablesPath["id"]
+
+			err = s.Update(id, reqStruct.FirstName, reqStruct.LastName, reqStruct.Email, reqStruct.Phone)
+			if err != nil {
+				w.WriteHeader(404)
+				json.NewEncoder(w).Encode(Response{Status: 404, Err: err.Error()}) //Aqui devolvemo el posible erro
+				return
+			}
+			json.NewEncoder(w).Encode(&Response{Status: 200, Data: map[string]string{"id": id, "msg": "success"}})
+
+		}
+	}
+*/
+func makeGetEndpoint(s Service) Controller {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		fmt.Println("get user")
+
+		getReq := request.(GetRequest) //Obtendremos un GetRequest (qie tiene el id)
+
+		usuario, err := s.Get(ctx, getReq.ID)
+		if err != nil {
+			if usuario == nil { //Si usuario es vacio da 404
+				return nil, response.NotFound(err.Error() + ". user with id " + getReq.ID + " doesn't exist")
+				//json.NewEncoder(w).Encode(&Response{Status: 404, Err: err.Error() + ". user with id " + id + " doesn't exist"}) //Aqui devolvemo el posible erro
+			} else {
+				return nil, response.BadRequest(err.Error())
+			}
+		}
+		return response.OK("success", usuario, nil), nil
 
 	}
 }
-func makeGetAllEndpoint(s Service, config Config) Controller {
-	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
-		fmt.Println("getall user")
-		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
-		//URL.Query() que viene del request
-		//Query() devielve un objeto que permite acceder a los parametros d la url (...?campo=123&campo2=hola)
-		variablesURL := r.URL.Query()
+func makeGetAllEndpoint(s Service, config Config) Controller {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		fmt.Println("getall user")
+
+		getAllParametros := request.(GetAllRequest)
 		//Luego con podemos acceder a los parametos y guardarlos en el struct Filtro (creado en service.go)
 		filtros := Filtros{
-			FirstName: variablesURL.Get("first_name"),
-			LastName:  variablesURL.Get("last_name"),
+			FirstName: getAllParametros.FirstName,
+			LastName:  getAllParametros.LastName,
 		}
-		//Ahora obtendremos el limit y la pagina desde los parametros
-		limit, _ := strconv.Atoi(variablesURL.Get("limit"))
-		page, _ := strconv.Atoi(variablesURL.Get("page"))
 
 		//Ahora llamaremos al Count del service que creamos (antes de hacer la consulta completa)
-		cantidad, err := s.Count(filtros)
+		cantidad, err := s.Count(ctx, filtros)
 		if err != nil {
-			w.WriteHeader(500)
-			json.NewEncoder(w).Encode(&Response{Status: 500, Err: err.Error()}) //Aqui devolvemo el posible erro
-			return
+			return nil, response.InternalServerError(err.Error())
 		}
 		//Luego crearemos un meta y le agregaremos la cantidad que consultamos, luego el meta lo ageregaremos a la respuesta
-		meta, err := meta.New(page, limit, cantidad, config.LimitPageDefault)
-
-		allUsers, err := s.GetAll(filtros, meta.Offset(), meta.Limit()) //GetAll recibe el offset (desde q resultado mostrar) y el limit (cuantos desde el offset)
+		meta, err := meta.New(getAllParametros.Page, getAllParametros.Limit, cantidad, config.LimitPageDefault)
 		if err != nil {
-			w.WriteHeader(400)
-			json.NewEncoder(w).Encode(&Response{Status: 400, Err: err.Error()}) //Aqui devolvemo el posible erro
-			return
+			return nil, response.InternalServerError(err.Error())
 		}
 
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: allUsers, Meta: meta})
+		allUsers, err := s.GetAll(ctx, filtros, meta.Offset(), meta.Limit()) //GetAll recibe el offset (desde q resultado mostrar) y el limit (cuantos desde el offset)
+		if err != nil {
+			return nil, response.InternalServerError(err.Error())
+		}
+
+		return response.OK("success", allUsers, meta), nil
 	}
 }
-*/
