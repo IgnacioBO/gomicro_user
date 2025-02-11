@@ -56,6 +56,20 @@ func NewUserHTTPServer(ctx context.Context, endpoints user.Endpoints) http.Handl
 		opciones...,
 	)).Methods("GET")
 
+	router.Handle("/users/{id}", httptransport.NewServer( //
+		endpoint.Endpoint(endpoints.Delete),
+		decodeDeleteUser,
+		encodeResponse,
+		opciones...,
+	)).Methods("DELETE")
+
+	router.Handle("/users/{id}", httptransport.NewServer( //
+		endpoint.Endpoint(endpoints.Update),
+		decodeUpdateUser,
+		encodeResponse,
+		opciones...,
+	)).Methods("PATCH")
+
 	return router
 }
 
@@ -78,7 +92,7 @@ func decodeCreateUser(_ context.Context, r *http.Request) (interface{}, error) {
 // Esta funcion sera la que se necarge QUE DEVUEVLER EL ENDPOINT, osea esl a respiesta al cliente
 // Oosea corre despues de endpoint.go (osea segun lo que devuelva la funcion con return aqui se maneja)
 func encodeResponse(ctx context.Context, w http.ResponseWriter, resp interface{}) error {
-	rInterface := resp.(response.Response)                            //Transformamos el resp a response.Respone (al interface)
+	rInterface := resp.(response.Response)                            //Transformamos el resp a response.Respone (al interface) -> YA QUE LE ENAIREMOS SIEMPRE UN objeto RESPONSE (CREADO POR NOSOTROS, q tiene el code, mensage, meta, etc, todo el json)
 	w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 	w.WriteHeader(rInterface.StatusCode())
 	return json.NewEncoder(w).Encode(rInterface) //resp tendra el user.User del domain y otroas datos si es necesario para ocnveritse en json
@@ -97,7 +111,7 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 
 }
 
-// *** MIDDLEWARE RESPONSE GET ***
+// *** MIDDLEWARE REQUEST GET ***
 // Funcion de decode, de GET
 func decodeGetUser(_ context.Context, r *http.Request) (interface{}, error) {
 	var getReq user.GetRequest
@@ -110,7 +124,7 @@ func decodeGetUser(_ context.Context, r *http.Request) (interface{}, error) {
 
 }
 
-// *** MIDDLEWARE RESPONSE GET All ***
+// *** MIDDLEWARE REQUEST GET All ***
 // Funcion de decode, de GET
 func decodeGetAllUser(_ context.Context, r *http.Request) (interface{}, error) {
 	//Query() devielve un objeto que permite acceder a los parametros d la url (...?campo=123&campo2=hola)
@@ -128,5 +142,34 @@ func decodeGetAllUser(_ context.Context, r *http.Request) (interface{}, error) {
 	}
 
 	return getReqAll, nil
+}
+
+// *** MIDDLEWARE REQUEST Delete ***
+func decodeDeleteUser(_ context.Context, r *http.Request) (interface{}, error) {
+	variablesPath := mux.Vars(r)
+	id := variablesPath["id"]
+	fmt.Println("id a eliminar es:", id)
+	deleteReq := user.DeleteRequest{ID: id}
+
+	return deleteReq, nil
+
+}
+
+// *** MIDDLEWARE REQUEST Delete***
+func decodeUpdateUser(_ context.Context, r *http.Request) (interface{}, error) {
+	var reqStruct user.UpdateRequest
+
+	err := json.NewDecoder(r.Body).Decode(&reqStruct)
+	if err != nil {
+		return nil, response.BadRequest(fmt.Sprintf("invalid request format: '%v'", err.Error()))
+	}
+
+	variablesPath := mux.Vars(r)
+	println("TET")
+
+	println(variablesPath["id"])
+	reqStruct.ID = variablesPath["id"]
+
+	return reqStruct, nil
 
 }

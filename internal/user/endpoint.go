@@ -36,6 +36,7 @@ type (
 	//Definiremos una struct para definir el request del UPDATE, con los campos que quiero y SE PODRAN ACTUALIZAR y los tags de json
 	//Seran de tipo puntero * para que puedan venir vacios y poder separar entre vacios "" y que no vengan
 	UpdateRequest struct {
+		ID        string  `json:"-"`
 		FirstName *string `json:"first_name"`
 		LastName  *string `json:"last_name"`
 		Email     *string `json:"email"`
@@ -45,6 +46,11 @@ type (
 	//Un struct base del Get que recibe un string que es el id
 	GetRequest struct {
 		ID string
+	}
+
+	//Un struct base del Delete que recibe un string que es el id
+	DeleteRequest struct {
+		ID string `json:"id"`
 	}
 
 	//Este struct tendra los PARAMETROS de la URL para pasarselo
@@ -68,37 +74,31 @@ func MakeEndpoints(s Service, config Config) Endpoints {
 	return Endpoints{
 		Create: makeCreateEndpoint(s),
 		Get:    makeGetEndpoint(s),
-		/*	Update: makeUpdateEndpoint(s),
-			Delete: makeDeleteEndpoint(s),*/
+		Update: makeUpdateEndpoint(s),
+		Delete: makeDeleteEndpoint(s),
 		GetAll: makeGetAllEndpoint(s, config),
 	}
 }
 
 // Este devolver un Controller, retora una función de tipo Controller (que definimos arriba) con esta caractesitica
 // Es privado porque se llamar solo de este dominio
-/*
-func makeDeleteEndpoint(s Service) Controller {
-	return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
-		fmt.Println("delete user")
-		w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
 
-		variablesPath := mux.Vars(r)
-		id := variablesPath["id"]
-		fmt.Println("id a eliminar es:", id)
-		err := s.Delete(id)
+func makeDeleteEndpoint(s Service) Controller {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		fmt.Println("delete user")
+
+		delStruct := request.(DeleteRequest)
+		err := s.Delete(ctx, delStruct.ID)
 		if err != nil {
-			w.WriteHeader(404)
-			json.NewEncoder(w).Encode(&Response{Status: 404, Err: err.Error()}) //Aqui devolvemo el posible erro
-			return
+			return nil, response.NotFound(err.Error())
 		}
 
 		//Aqui le pasamos Response como struct para ahorrar memoria
 		//Con puntero (&Response): Encode accede al struct original a través de la dirección de memoria. Esto evita copiar los datos.
 		//Sin puntero (Response): Encode recibe una copia del struct completo, lo que puede ocupar más memoria si el struct es muy grande.
-		json.NewEncoder(w).Encode(&Response{Status: 200, Data: map[string]string{"id": id, "msg": "success"}})
+		return response.OK("success", delStruct, nil), nil
 	}
 }
-*/
 
 // request (interface{}) lo pasará el middleware y TENDRA ya los datos del request en un struct listo para usar
 func makeCreateEndpoint(s Service) Controller {
@@ -137,51 +137,35 @@ func makeCreateEndpoint(s Service) Controller {
 	}
 }
 
-/*
-	func makeUpdateEndpoint(s Service) Controller {
-		return func(ctx context.Context, request interface{}) (repsonse interface{}, err error) {
-			fmt.Println("update user")
-			w.Header().Add("Content-Type", "application/json; charset=utf-8") //Linea miea para que se determine que respondera un json
+func makeUpdateEndpoint(s Service) Controller {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		fmt.Println("update user")
 
-			//Variable con struct de request (datos de atualizacion)
-			var reqStruct UpdateRequest
-			//r.Body tiene el body del request (se espera JSON) y lo decodifica al struct (reqStruct) (osea pasar el json enviado en el request a un struct)
-			err := json.NewDecoder(r.Body).Decode(&reqStruct)
-			if err != nil {
-				w.WriteHeader(400)
-				json.NewEncoder(w).Encode(&Response{Status: 400, Err: "invalid request format"})
-				return
-			}
+		//Variable con struct de request (datos de atualizacion)
+		reqStruct := request.(UpdateRequest)
 
-			//Validaciones para que sean reqierod
-			//Si first name es disinto de nil (osea el puntero NO VIENE VACIO) y le pone "first_name" como vacio (osea el cliene pone first_name = "") da error
-			//PERO SI EL CLIENTE NO ENVIA first_namem reqStruct.Firstname sera igual a NIL! entonces no entra
-			//OSea se permite NO ENVIAR ESTOS CAMPOS, PERO NO SE PERMITE ENVIARLSO VACIOS
-			if reqStruct.FirstName != nil && *reqStruct.FirstName == "" {
-				w.WriteHeader(400)
-				json.NewEncoder(w).Encode(&Response{Status: 400, Err: "first_name can't be empty"})
-				return
-			}
+		//Permite NO ENVIAR ESTOS CAMPOS, PERO NO SE PERMITE ENVIARLSO VACIOS
+		if reqStruct.FirstName != nil && *reqStruct.FirstName == "" {
+			return nil, response.BadRequest("first_name can't be empty")
+		}
 
-			if reqStruct.LastName != nil && *reqStruct.LastName == "" {
-				w.WriteHeader(400)
-				json.NewEncoder(w).Encode(&Response{Status: 400, Err: "last_name can't be empty"})
-				return
-			}
-			variablesPath := mux.Vars(r)
-			id := variablesPath["id"]
+		if reqStruct.LastName != nil && *reqStruct.LastName == "" {
+			return nil, response.BadRequest("last_name can't be empty")
+		}
 
-			err = s.Update(id, reqStruct.FirstName, reqStruct.LastName, reqStruct.Email, reqStruct.Phone)
-			if err != nil {
-				w.WriteHeader(404)
-				json.NewEncoder(w).Encode(Response{Status: 404, Err: err.Error()}) //Aqui devolvemo el posible erro
-				return
-			}
-			json.NewEncoder(w).Encode(&Response{Status: 200, Data: map[string]string{"id": id, "msg": "success"}})
+		id := reqStruct.ID
+
+		err := s.Update(ctx, id, reqStruct.FirstName, reqStruct.LastName, reqStruct.Email, reqStruct.Phone)
+		if err != nil {
+			return nil, response.NotFound(err.Error())
 
 		}
+
+		return response.OK("success", map[string]string{"id": id}, nil), nil
+
 	}
-*/
+}
+
 func makeGetEndpoint(s Service) Controller {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		fmt.Println("get user")
