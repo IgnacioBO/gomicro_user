@@ -95,6 +95,12 @@ func (r *repo) Get(ctx context.Context, id string) (*domain.User, error) {
 	result := r.db.WithContext(ctx).First(&usuario)
 	if result.Error != nil {
 		r.log.Println(result.Error)
+		//EN LOS GET, GORN Arroja un error CUANDO NO HAY RECORd en un GET, asi que ee eror puede identificarse y devoelr un error especifico:
+		//Una manera de controlar E IDENTIFICAR EL ERROR de que NO HAY RRECORD es decir que si Error es == gorm.ErrRecordNotDFound (un tipo de error definido por gorm)
+		//Ahi deviler un error user not foud (Pero yo lo controlo igual desde la capa endpoint ¿talves no corresponde?)
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, ErrUserNotFound{id}
+		}
 		return nil, result.Error
 	}
 	r.log.Printf("user retrieved with id: %s, rows affected: %d\n", id, result.RowsAffected)
@@ -116,7 +122,7 @@ func (r *repo) Delete(ctx context.Context, id string) error {
 	}
 	if result.RowsAffected == 0 {
 		r.log.Println("user with id: %s not found, rows affected: %d\n", id, result.RowsAffected)
-		return fmt.Errorf("user with id: %s not found", id)
+		return ErrUserNotFound{id}
 	}
 	r.log.Printf("user deleted with id: %s, rows affected: %d\n", id, result.RowsAffected)
 	return nil
@@ -155,7 +161,7 @@ func (r *repo) Update(ctx context.Context, id string, firstName *string, lastNam
 	}
 	if result.RowsAffected == 0 {
 		r.log.Println("user with id: %s not found, rows affected: %d\n", id, result.RowsAffected)
-		return fmt.Errorf("user with id: %s not found", id)
+		return ErrUserNotFound{id}
 	}
 	r.log.Printf("user updated with id: %s, rows affected: %d\n", id, result.RowsAffected)
 

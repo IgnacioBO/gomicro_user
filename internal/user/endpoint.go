@@ -5,6 +5,7 @@ package user
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/IgnacioBO/go_lib_response/response"
@@ -36,7 +37,7 @@ type (
 	//Definiremos una struct para definir el request del UPDATE, con los campos que quiero y SE PODRAN ACTUALIZAR y los tags de json
 	//Seran de tipo puntero * para que puedan venir vacios y poder separar entre vacios "" y que no vengan
 	UpdateRequest struct {
-		ID        string  `json:"-"`
+		ID        string
 		FirstName *string `json:"first_name"`
 		LastName  *string `json:"last_name"`
 		Email     *string `json:"email"`
@@ -90,12 +91,13 @@ func makeDeleteEndpoint(s Service) Controller {
 		delStruct := request.(DeleteRequest)
 		err := s.Delete(ctx, delStruct.ID)
 		if err != nil {
-			return nil, response.NotFound(err.Error())
+			//Validamos con As, comparaos con la escutura a ver si es la misma (mismo tipo de strict)
+			if errors.As(err, &ErrUserNotFound{}) {
+				return nil, response.NotFound(err.Error())
+			}
+			return nil, response.InternalServerError(err.Error())
 		}
 
-		//Aqui le pasamos Response como struct para ahorrar memoria
-		//Con puntero (&Response): Encode accede al struct original a través de la dirección de memoria. Esto evita copiar los datos.
-		//Sin puntero (Response): Encode recibe una copia del struct completo, lo que puede ocupar más memoria si el struct es muy grande.
 		return response.OK("success", delStruct, nil), nil
 	}
 }
@@ -116,11 +118,11 @@ func makeCreateEndpoint(s Service) Controller {
 		//Validaciones
 		if reqStruct.FirstName == "" {
 			//return nil, errors.New("first_name is required")
-			return nil, response.BadRequest("first_name is required")
+			return nil, response.BadRequest(ErrFirstNameRequired.Error())
 
 		}
 		if reqStruct.LastName == "" {
-			return nil, response.BadRequest("last_name is required")
+			return nil, response.BadRequest(ErrLastNameRequired.Error())
 		}
 		fmt.Println(reqStruct)
 		reqStrucEnJson, _ := json.MarshalIndent(reqStruct, "", " ")
@@ -146,19 +148,22 @@ func makeUpdateEndpoint(s Service) Controller {
 
 		//Permite NO ENVIAR ESTOS CAMPOS, PERO NO SE PERMITE ENVIARLSO VACIOS
 		if reqStruct.FirstName != nil && *reqStruct.FirstName == "" {
-			return nil, response.BadRequest("first_name can't be empty")
+			return nil, response.BadRequest(ErrFirstNameNotEmpty.Error())
 		}
 
 		if reqStruct.LastName != nil && *reqStruct.LastName == "" {
-			return nil, response.BadRequest("last_name can't be empty")
+			return nil, response.BadRequest(ErrLastNameNotEmpty.Error())
 		}
 
 		id := reqStruct.ID
 
 		err := s.Update(ctx, id, reqStruct.FirstName, reqStruct.LastName, reqStruct.Email, reqStruct.Phone)
 		if err != nil {
-			return nil, response.NotFound(err.Error())
-
+			//Validamos
+			if errors.As(err, &ErrUserNotFound{}) {
+				return nil, response.NotFound(err.Error())
+			}
+			return nil, response.InternalServerError(err.Error())
 		}
 
 		return response.OK("success", map[string]string{"id": id}, nil), nil
@@ -174,11 +179,16 @@ func makeGetEndpoint(s Service) Controller {
 
 		usuario, err := s.Get(ctx, getReq.ID)
 		if err != nil {
+			/* MI MANERA ANTIGUA, pero ahora lo controlamos desde repositorty
 			if usuario == nil { //Si usuario es vacio da 404
-				return nil, response.NotFound(err.Error() + ". user with id " + getReq.ID + " doesn't exist")
+				return nil, response.NotFound(ErrUserNotFound{getReq.ID}.Error())
 				//json.NewEncoder(w).Encode(&Response{Status: 404, Err: err.Error() + ". user with id " + id + " doesn't exist"}) //Aqui devolvemo el posible erro
+			} */
+			//Validamos con As, comparaos con la escutura a ver si es la misma (mismo tipo de strict)
+			if errors.As(err, &ErrUserNotFound{}) {
+				return nil, response.NotFound(err.Error())
 			} else {
-				return nil, response.BadRequest(err.Error())
+				return nil, response.InternalServerError(err.Error())
 			}
 		}
 		return response.OK("success", usuario, nil), nil

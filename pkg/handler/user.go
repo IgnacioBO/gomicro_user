@@ -165,9 +165,6 @@ func decodeUpdateUser(_ context.Context, r *http.Request) (interface{}, error) {
 	}
 
 	variablesPath := mux.Vars(r)
-	println("TET")
-
-	println(variablesPath["id"])
 	reqStruct.ID = variablesPath["id"]
 
 	return reqStruct, nil
