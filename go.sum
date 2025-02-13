@@ -1,7 +1,5 @@
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
-github.com/IgnacioBO/go_lib_response v0.0.1 h1:Qm9EAgM1Qcd5l1KuB33NVNkFvLGr4u8+Hfsieki059U=
-github.com/IgnacioBO/go_lib_response v0.0.1/go.mod h1:cV03c5A6JhRr0gxaUvkV8djLtpWscF1dHec3PDMQyAM=
 github.com/IgnacioBO/go_lib_response v0.0.2 h1:LGUeJzw5gqrFvyCflZDqsusZWqKMCdeFbZ/7YYZwxgs=
 github.com/IgnacioBO/go_lib_response v0.0.2/go.mod h1:cV03c5A6JhRr0gxaUvkV8djLtpWscF1dHec3PDMQyAM=
 github.com/IgnacioBO/gomicro_domain v0.0.1 h1:8kD2DmZaguTKMm7p47rT+oboM4KENWirPa5roouItT0=
