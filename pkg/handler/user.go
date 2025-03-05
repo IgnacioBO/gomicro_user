@@ -33,7 +33,12 @@ func NewUserHTTPServer(ctx context.Context, endpoints user.Endpoints) http.Handl
 
 	//Antiguo router.HandleFunc("/users", userEndpoint.Create).Methods("POST")
 	//Ahora usaremos Handle, poreque a este se le puede pasar un server
-	router.Handle("/users", httptransport.NewServer( //Con httptranpsort podemos apsarle un server al HHandle
+	//Handre recibe un string y un http.Handler (una interfaz)
+	//****Con httptranpsort podemos apsarle un server al Handle (NewServer devuelve un struct httptransport.Server)***
+	//ese struct tiene una funncion -> func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request)
+	// ESA FUNCION es la misma que usa que tiene la interfaz http.Handler y que se debe IMPLEMENTAR -> asi es -> type Handler interface {ServeHTTP(ResponseWriter, *Request)}
+	// COMO ese struct (httptransport.Server) IMPLENENTA la funcion ServeHTTP de la interfaz http.Hnadler, puede pasarse aqui sin problemas
+	router.Handle("/users", httptransport.NewServer(
 		endpoint.Endpoint(endpoints.Create), //EN el tutorial le pasa riecto endpoints.Create, PERO DEBIDO A MI VERSION MAS NUEV DE GO, se hace UNA CONVERSION de Type Controller a Endpoint de manera epxlicia (a pesar de q son identicads)
 		decodeCreateUser,                    //le pasamos la funcion, como referencia para que la ocupe newServer
 		encodeResponse,
