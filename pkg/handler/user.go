@@ -7,8 +7,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/IgnacioBO/go_lib_response/response"
@@ -77,6 +79,10 @@ func NewUserHTTPServer(ctx context.Context, endpoints user.Endpoints) http.Handl
 // Funcion de decode, hacer decode dentro del REQUEST cuando usmoos Create d user, osea lo que aceoms anted en endpoint.go
 // Devolver a una interface{} que en este caso sera un Struct del CreatReq (qeu tiene firstname, lastname, etc) y lo recibira el endpoint.go
 func decodeCreateUser(_ context.Context, r *http.Request) (interface{}, error) {
+	//Le pasamos un validador de auth (que le pasamos del token del header)
+	if err := authorization(r.Header.Get("Authorization")); err != nil {
+		return nil, response.Forbidden(err.Error())
+	}
 	var reqStruct user.CreateRequest
 
 	//Ahora hacemos el decode del body del json al srtuct de REquest de usuario
@@ -114,6 +120,10 @@ func encodeError(_ context.Context, err error, w http.ResponseWriter) {
 // *** MIDDLEWARE REQUEST GET ***
 // Funcion de decode, de GET
 func decodeGetUser(_ context.Context, r *http.Request) (interface{}, error) {
+	//Le pasamos un validador de auth (que le pasamos del token del header)
+	if err := authorization(r.Header.Get("Authorization")); err != nil {
+		return nil, response.Forbidden(err.Error())
+	}
 	var getReq user.GetRequest
 	variablesPath := mux.Vars(r)
 	getReq.ID = variablesPath["id"] //OBtenemos el id y lo guardamos en el cmapo ID de getReq
@@ -127,6 +137,10 @@ func decodeGetUser(_ context.Context, r *http.Request) (interface{}, error) {
 // *** MIDDLEWARE REQUEST GET All ***
 // Funcion de decode, de GET
 func decodeGetAllUser(_ context.Context, r *http.Request) (interface{}, error) {
+	//Le pasamos un validador de auth (que le pasamos del token del header)
+	if err := authorization(r.Header.Get("Authorization")); err != nil {
+		return nil, response.Forbidden(err.Error())
+	}
 	//Query() devielve un objeto que permite acceder a los parametros d la url (...?campo=123&campo2=hola)
 	variablesURL := r.URL.Query()
 
@@ -146,6 +160,10 @@ func decodeGetAllUser(_ context.Context, r *http.Request) (interface{}, error) {
 
 // *** MIDDLEWARE REQUEST Delete ***
 func decodeDeleteUser(_ context.Context, r *http.Request) (interface{}, error) {
+	//Le pasamos un validador de auth (que le pasamos del token del header)
+	if err := authorization(r.Header.Get("Authorization")); err != nil {
+		return nil, response.Forbidden(err.Error())
+	}
 	variablesPath := mux.Vars(r)
 	id := variablesPath["id"]
 	fmt.Println("id a eliminar es:", id)
@@ -157,6 +175,10 @@ func decodeDeleteUser(_ context.Context, r *http.Request) (interface{}, error) {
 
 // *** MIDDLEWARE REQUEST Delete***
 func decodeUpdateUser(_ context.Context, r *http.Request) (interface{}, error) {
+	//Le pasamos un validador de auth (que le pasamos del token del header)
+	if err := authorization(r.Header.Get("Authorization")); err != nil {
+		return nil, response.Forbidden(err.Error())
+	}
 	var reqStruct user.UpdateRequest
 
 	err := json.NewDecoder(r.Body).Decode(&reqStruct)
@@ -169,4 +191,12 @@ func decodeUpdateUser(_ context.Context, r *http.Request) (interface{}, error) {
 
 	return reqStruct, nil
 
+}
+
+// Authoruzation con tiken
+func authorization(token string) error {
+	if token != os.Getenv("TOKEN") {
+		return errors.New("invalid token")
+	}
+	return nil
 }
